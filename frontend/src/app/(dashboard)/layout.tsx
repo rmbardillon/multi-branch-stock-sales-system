@@ -100,7 +100,15 @@ export default function DashboardLayout({
   }
 
   if (!user) {
-    return null;
+    // Redirect to login if not authenticated after loading completes
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-muted-foreground">Redirecting...</div>
+      </div>
+    );
   }
 
   const filteredNavItems = navItems.filter((item) =>
