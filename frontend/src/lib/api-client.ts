@@ -39,10 +39,11 @@ class ApiClient {
     });
 
     if (response.status === 401) {
-      // Clear token and redirect to login on unauthorized
+      // Clear token, user, and cookie then redirect to login
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
+        document.cookie = 'auth_token=; path=/; max-age=0; SameSite=Lax';
         window.location.href = '/login?session_expired=true';
       }
       throw new ApiClientError('Session expired', 401);
