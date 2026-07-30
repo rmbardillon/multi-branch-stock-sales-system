@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "baseUrl": "..",
+    "types": ["vitest/globals"],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["./**/*.ts", "../src/**/*.ts"],
+  "exclude": ["../node_modules", "../dist"]
+}
