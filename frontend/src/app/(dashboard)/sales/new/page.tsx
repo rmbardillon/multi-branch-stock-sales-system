@@ -226,7 +226,7 @@ export default function NewSalePage() {
                       <div>
                         <div className="text-sm font-medium">{item.name}</div>
                         <div className="text-xs text-muted-foreground">
-                          SKU: {item.sku} &middot; ${item.unit_price.toFixed(2)}{" "}
+                          SKU: {item.sku} &middot; ${Number(item.unit_price).toFixed(2)}{" "}
                           &middot; Available: {available}
                         </div>
                       </div>
@@ -297,7 +297,7 @@ export default function NewSalePage() {
                         {li.available_quantity}
                       </span>
                     </TableCell>
-                    <TableCell>${li.unit_price.toFixed(2)}</TableCell>
+                    <TableCell>${Number(li.unit_price).toFixed(2)}</TableCell>
                     <TableCell className="font-medium">
                       ${lineTotal.toFixed(2)}
                     </TableCell>

@@ -100,13 +100,9 @@ export default function DashboardLayout({
   }
 
   if (!user) {
-    // Redirect to login if not authenticated after loading completes
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="text-muted-foreground">Redirecting...</div>
+        <div className="text-muted-foreground">Loading...</div>
       </div>
     );
   }
