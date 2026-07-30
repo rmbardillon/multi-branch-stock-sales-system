@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { useAuthContext } from "@/providers/auth-provider";
+import { useBranches, type Branch } from "@/hooks/use-branches";
 import {
   useTransfers,
   useConfirmTransfer,
@@ -27,8 +28,15 @@ export default function TransfersPage() {
 
   const canInitiate =
     user?.role === "Admin" || user?.role === "Branch_Manager";
+  const isAdmin = user?.role === "Admin";
 
-  const branchId = user?.assignedBranchId;
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(
+    user?.assignedBranchId ?? null
+  );
+
+  const branchId = isAdmin ? selectedBranchId : user?.assignedBranchId;
+
+  const { data: branches } = useBranches({ status: "Active" });
 
   const [filters, setFilters] = useState<TransferFilters>({
     page: 1,
@@ -86,8 +94,28 @@ export default function TransfersPage() {
         )}
       </div>
 
-      {/* Status filter */}
+      {/* Filters */}
       <div className="flex flex-wrap items-end gap-4">
+        {isAdmin && branches && branches.length > 0 && (
+          <div className="space-y-1">
+            <Label>Branch</Label>
+            <Select
+              value={selectedBranchId ?? ""}
+              onValueChange={(value) => setSelectedBranchId(value || null)}
+            >
+              <SelectTrigger className="w-52">
+                <SelectValue placeholder="Select branch" />
+              </SelectTrigger>
+              <SelectContent>
+                {branches.map((branch: Branch) => (
+                  <SelectItem key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="space-y-1">
           <Label>Status</Label>
           <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
@@ -103,6 +131,13 @@ export default function TransfersPage() {
           </Select>
         </div>
       </div>
+
+      {/* No branch selected (Admin) */}
+      {!branchId && isAdmin && (
+        <div className="rounded-md border border-dashed py-12 text-center text-muted-foreground">
+          Select a branch to view transfers.
+        </div>
+      )}
 
       {/* Error state */}
       {error && (

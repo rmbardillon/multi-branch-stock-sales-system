@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   GitBranch,
@@ -16,6 +16,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { useAuthContext, type Role } from "@/providers/auth-provider";
+import { useLogout } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -88,8 +89,10 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, logout, isLoading } = useAuthContext();
+  const { user, isLoading } = useAuthContext();
+  const { mutate: handleLogout, isPending: isLoggingOut } = useLogout();
   const pathname = usePathname();
+  const router = useRouter();
 
   if (isLoading) {
     return (
@@ -100,11 +103,8 @@ export default function DashboardLayout({
   }
 
   if (!user) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    );
+    router.push('/login');
+    return null;
   }
 
   const filteredNavItems = navItems.filter((item) =>
@@ -149,10 +149,11 @@ export default function DashboardLayout({
             variant="outline"
             size="sm"
             className="w-full"
-            onClick={logout}
+            onClick={() => handleLogout()}
+            disabled={isLoggingOut}
           >
             <LogOut className="mr-2 h-4 w-4" />
-            Logout
+            {isLoggingOut ? "Logging out..." : "Logout"}
           </Button>
         </div>
       </aside>

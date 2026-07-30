@@ -6,10 +6,18 @@ import { Search, Plus, Trash2, CheckCircle } from "lucide-react";
 import { useAuthContext } from "@/providers/auth-provider";
 import { useSearchStockItems, type StockItem } from "@/hooks/use-stock-items";
 import { useInventory } from "@/hooks/use-inventory";
+import { useBranches } from "@/hooks/use-branches";
 import { useCreateSale } from "@/hooks/use-sales";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -55,7 +63,13 @@ function useDebounce<T>(value: T, delay: number): T {
 export default function NewSalePage() {
   const router = useRouter();
   const { user } = useAuthContext();
-  const branchId = user?.assignedBranchId;
+  const isAdmin = user?.role === "Admin";
+
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
+  const branchId = isAdmin ? selectedBranchId : user?.assignedBranchId;
+
+  // Fetch branches for Admin's branch selector
+  const { data: branches } = useBranches({ status: "Active" });
 
   const [searchQuery, setSearchQuery] = useState("");
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -67,7 +81,7 @@ export default function NewSalePage() {
   const debouncedSearch = useDebounce(searchQuery, 300);
   const { data: searchResults, isLoading: isSearching } =
     useSearchStockItems(debouncedSearch);
-  const { data: inventoryData } = useInventory(branchId);
+  const { data: inventoryData, isLoading: isInventoryLoading } = useInventory(branchId);
   const createSale = useCreateSale();
 
   // Get available stock for a given item at the user's branch
@@ -81,6 +95,23 @@ export default function NewSalePage() {
     },
     [inventoryData]
   );
+
+  // Keep line items' available_quantity in sync when inventoryData loads/updates
+  useEffect(() => {
+    if (!inventoryData || lineItems.length === 0) return;
+    setLineItems((prev) =>
+      prev.map((li) => {
+        const stockLevel = inventoryData.find(
+          (sl) => sl.stock_item_id === li.stock_item_id
+        );
+        const freshAvailable = stockLevel?.quantity ?? 0;
+        if (freshAvailable !== li.available_quantity) {
+          return { ...li, available_quantity: freshAvailable };
+        }
+        return li;
+      })
+    );
+  }, [inventoryData]);
 
   function handleAddItem(item: StockItem) {
     // Don't add duplicates
@@ -132,7 +163,7 @@ export default function NewSalePage() {
         line_items: lineItems.map((li) => ({
           stock_item_id: li.stock_item_id,
           quantity: li.quantity,
-          unit_price: li.unit_price,
+          unit_price: Number(li.unit_price),
         })),
       });
       setSuccessRef(result.reference_number);
@@ -187,6 +218,31 @@ export default function NewSalePage() {
         </p>
       </div>
 
+      {/* Branch selector for Admin users */}
+      {isAdmin && (
+        <div className="space-y-2 max-w-md">
+          <Label>Branch</Label>
+          <Select
+            value={selectedBranchId}
+            onValueChange={(value) => {
+              setSelectedBranchId(value);
+              setLineItems([]);
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a branch" />
+            </SelectTrigger>
+            <SelectContent>
+              {branches?.map((branch) => (
+                <SelectItem key={branch.id} value={branch.id}>
+                  {branch.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {/* Stock item search */}
       <div className="space-y-2">
         <Label>Search Stock Items</Label>
@@ -227,7 +283,7 @@ export default function NewSalePage() {
                         <div className="text-sm font-medium">{item.name}</div>
                         <div className="text-xs text-muted-foreground">
                           SKU: {item.sku} &middot; ${Number(item.unit_price).toFixed(2)}{" "}
-                          &middot; Available: {available}
+                          &middot; Available: {isInventoryLoading ? "..." : available}
                         </div>
                       </div>
                       <Button

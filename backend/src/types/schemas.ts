@@ -115,7 +115,7 @@ export const updateStockItemSchema = z.object({
 const saleLineItemSchema = z.object({
   stock_item_id: z.string().uuid('Stock item ID must be a valid UUID'),
   quantity: z.number().int('Quantity must be an integer').min(1, 'Quantity must be at least 1'),
-  unit_price: z
+  unit_price: z.coerce
     .number()
     .min(0.01, 'Unit price must be at least 0.01')
     .max(999999999.99, 'Unit price must be at most 999,999,999.99'),
