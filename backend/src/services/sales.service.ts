@@ -195,6 +195,81 @@ export class SalesService {
   }
 
   /**
+   * Get sale transactions across all branches with optional filtering and pagination.
+   * Includes line items with stock item names.
+   */
+  async getAllTransactions(
+    filters?: SaleFilters
+  ): Promise<PaginatedSales> {
+    const page = filters?.page ?? 1;
+    const pageSize = filters?.pageSize ?? 20;
+    const offset = (page - 1) * pageSize;
+
+    // Build query conditions
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+    let paramIndex = 1;
+
+    if (filters?.startDate) {
+      conditions.push(`st.transaction_date >= $${paramIndex++}`);
+      values.push(filters.startDate);
+    }
+
+    if (filters?.endDate) {
+      conditions.push(`st.transaction_date <= $${paramIndex++}`);
+      values.push(filters.endDate);
+    }
+
+    const whereClause = conditions.length > 0
+      ? 'WHERE ' + conditions.join(' AND ')
+      : '';
+
+    // Get total count
+    const countResult = await query(
+      `SELECT COUNT(*) as total FROM sale_transactions st ${whereClause}`,
+      values
+    );
+    const total = parseInt(countResult.rows[0].total, 10);
+
+    // Get paginated transactions
+    const transactionsResult = await query(
+      `SELECT st.*
+       FROM sale_transactions st
+       ${whereClause}
+       ORDER BY st.transaction_date DESC
+       LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
+      [...values, pageSize, offset]
+    );
+
+    const transactions: SaleTransactionWithLineItems[] = [];
+
+    // Fetch line items for each transaction
+    for (const txn of transactionsResult.rows) {
+      const lineItemsResult = await query(
+        `SELECT sli.*, si.name AS stock_item_name, si.sku AS stock_item_sku
+         FROM sale_line_items sli
+         JOIN stock_items si ON sli.stock_item_id = si.id
+         WHERE sli.sale_transaction_id = $1
+         ORDER BY si.name ASC`,
+        [txn.id]
+      );
+
+      transactions.push({
+        ...txn,
+        line_items: lineItemsResult.rows as SaleLineItemWithDetails[],
+      });
+    }
+
+    return {
+      transactions,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    };
+  }
+
+  /**
    * Get sale transactions for a branch with optional filtering and pagination.
    * Includes line items with stock item names.
    */

@@ -14,6 +14,7 @@ import { useAuthContext } from "@/providers/auth-provider";
 import { useSalesReport } from "@/hooks/use-reports";
 import { useLowStockAlerts } from "@/hooks/use-inventory";
 import { useSales, type SaleTransaction } from "@/hooks/use-sales";
+import { formatCurrency } from "@/lib/currency";
 
 function getStartOfMonth(): string {
   const now = new Date();
@@ -30,12 +31,7 @@ function getToday(): string {
   return `${year}-${month}-${day}`;
 }
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
-}
+
 
 function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString("en-US", {
@@ -66,8 +62,7 @@ export default function DashboardPage() {
   const { data: alerts } = useLowStockAlerts(alertsBranchId);
 
   // Recent transactions (20 most recent)
-  // For Admin without an assigned branch, fetch all branches' sales is not
-  // supported by the single-branch endpoint, so we show a message instead.
+  // Admin (no branchId) fetches across all branches; others fetch their own branch.
   const { data: recentSalesData, isLoading: recentLoading } = useSales(
     branchId || null,
     { pageSize: 20 }

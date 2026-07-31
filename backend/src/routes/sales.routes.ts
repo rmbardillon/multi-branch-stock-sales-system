@@ -75,6 +75,67 @@ router.post(
 );
 
 /**
+ * GET /api/sales
+ * List sale transactions across ALL branches with optional filters.
+ * Requires: Admin role (no branch scoping).
+ *
+ * Query params: startDate, endDate, page, pageSize
+ * Returns: Paginated list of transactions with line items.
+ */
+router.get(
+  '/',
+  requirePermission('sales:read'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Parse query parameters
+      const startDate = typeof req.query.startDate === 'string'
+        ? new Date(req.query.startDate)
+        : undefined;
+      const endDate = typeof req.query.endDate === 'string'
+        ? new Date(req.query.endDate + 'T23:59:59.999Z')
+        : undefined;
+      const page = typeof req.query.page === 'string'
+        ? parseInt(req.query.page, 10)
+        : undefined;
+      const pageSize = typeof req.query.pageSize === 'string'
+        ? parseInt(req.query.pageSize, 10)
+        : undefined;
+
+      // Validate date parsing
+      if (startDate && isNaN(startDate.getTime())) {
+        res.status(400).json({
+          error: 'Validation error',
+          message: 'Invalid startDate format',
+        });
+        return;
+      }
+
+      if (endDate && isNaN(endDate.getTime())) {
+        res.status(400).json({
+          error: 'Validation error',
+          message: 'Invalid endDate format',
+        });
+        return;
+      }
+
+      const result = await salesService.getAllTransactions({
+        startDate,
+        endDate,
+        page: page && page > 0 ? page : undefined,
+        pageSize: pageSize && pageSize > 0 ? pageSize : undefined,
+      });
+
+      res.status(200).json(result);
+    } catch (error) {
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Failed to retrieve sale transactions',
+      });
+    }
+  }
+);
+
+/**
  * GET /api/sales/:branchId
  * List sale transactions for a branch with optional filters.
  * Requires: sales:read permission, scoped to the branch in params.

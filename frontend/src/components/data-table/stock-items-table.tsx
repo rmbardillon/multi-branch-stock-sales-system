@@ -22,15 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import type { StockItem } from "@/hooks/use-stock-items";
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
+import { formatCurrency } from "@/lib/currency";
 
 interface StockItemsTableProps {
   data: StockItem[];

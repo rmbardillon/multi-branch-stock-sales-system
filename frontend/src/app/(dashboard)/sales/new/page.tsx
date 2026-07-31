@@ -8,6 +8,7 @@ import { useSearchStockItems, type StockItem } from "@/hooks/use-stock-items";
 import { useInventory } from "@/hooks/use-inventory";
 import { useBranches } from "@/hooks/use-branches";
 import { useCreateSale } from "@/hooks/use-sales";
+import { formatCurrency } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -380,10 +381,7 @@ export default function NewSalePage() {
           <div className="text-lg font-semibold">
             Total:{" "}
             <span className="text-primary">
-              {new Intl.NumberFormat(undefined, {
-                style: "currency",
-                currency: "USD",
-              }).format(runningTotal)}
+              {formatCurrency(runningTotal)}
             </span>
           </div>
           <Button

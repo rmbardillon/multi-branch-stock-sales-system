@@ -55,13 +55,14 @@ const SALES_QUERY_KEY = ["sales"];
 
 /**
  * Fetch sales transactions for a specific branch with optional date range and pagination.
+ * If branchId is null/undefined, fetches across all branches (Admin only).
  */
 export function useSales(
   branchId: string | null | undefined,
   filters?: SaleFilters
 ) {
   return useQuery<PaginatedSalesResponse, ApiClientError>({
-    queryKey: [...SALES_QUERY_KEY, branchId, filters],
+    queryKey: [...SALES_QUERY_KEY, branchId ?? "all", filters],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filters?.startDate) params.append("startDate", filters.startDate);
@@ -70,9 +71,8 @@ export function useSales(
       if (filters?.pageSize)
         params.append("pageSize", String(filters.pageSize));
       const query = params.toString();
-      const endpoint = query
-        ? `/sales/${branchId}?${query}`
-        : `/sales/${branchId}`;
+      const basePath = branchId ? `/sales/${branchId}` : `/sales`;
+      const endpoint = query ? `${basePath}?${query}` : basePath;
       const response = await apiClient.get<{
         transactions: SaleTransaction[];
         total: number;
@@ -88,7 +88,6 @@ export function useSales(
         totalPages: response.totalPages,
       };
     },
-    enabled: !!branchId,
   });
 }
 

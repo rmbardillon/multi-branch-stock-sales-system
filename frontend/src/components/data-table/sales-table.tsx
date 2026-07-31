@@ -28,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { SaleTransaction } from "@/hooks/use-sales";
+import { formatCurrency } from "@/lib/currency";
 
 interface SalesTableProps {
   data: SaleTransaction[];
@@ -111,10 +112,7 @@ export function SalesTable({
           const amount = parseFloat(row.getValue("total_amount"));
           return (
             <span className="font-medium tabular-nums">
-              {new Intl.NumberFormat(undefined, {
-                style: "currency",
-                currency: "USD",
-              }).format(amount)}
+              {formatCurrency(amount)}
             </span>
           );
         },
@@ -273,10 +271,7 @@ export function SalesTable({
                 <div>
                   <span className="text-muted-foreground">Total</span>
                   <p className="font-medium text-lg tabular-nums">
-                    {new Intl.NumberFormat(undefined, {
-                      style: "currency",
-                      currency: "USD",
-                    }).format(Number(selectedSale.total_amount))}
+                    {formatCurrency(Number(selectedSale.total_amount))}
                   </p>
                 </div>
               </div>
@@ -335,10 +330,7 @@ export function SalesTable({
                     {selectedSale.line_items.reduce((s, li) => s + li.quantity, 0)} items total
                   </span>
                   <span className="font-bold text-lg tabular-nums">
-                    {new Intl.NumberFormat(undefined, {
-                      style: "currency",
-                      currency: "USD",
-                    }).format(Number(selectedSale.total_amount))}
+                    {formatCurrency(Number(selectedSale.total_amount))}
                   </span>
                 </div>
               )}
