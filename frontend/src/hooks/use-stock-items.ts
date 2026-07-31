@@ -34,10 +34,13 @@ export interface UpdateStockItemInput {
   low_stock_threshold?: number;
 }
 
-export function useStockItems() {
+export function useStockItems(includeInactive = false) {
   return useQuery<StockItem[], ApiClientError>({
-    queryKey: ["stock-items"],
-    queryFn: () => apiClient.get<StockItem[]>("/stock-items"),
+    queryKey: ["stock-items", { includeInactive }],
+    queryFn: () =>
+      apiClient.get<StockItem[]>(
+        includeInactive ? "/stock-items?includeInactive=true" : "/stock-items"
+      ),
   });
 }
 
@@ -73,6 +76,42 @@ export function useUpdateStockItem() {
   >({
     mutationFn: ({ id, data }) =>
       apiClient.put<StockItem>(`/stock-items/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-items"] });
+    },
+  });
+}
+
+export function useDeactivateStockItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation<StockItem, ApiClientError, string>({
+    mutationFn: (id) =>
+      apiClient.patch<StockItem>(`/stock-items/${id}/deactivate`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-items"] });
+    },
+  });
+}
+
+export function useReactivateStockItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation<StockItem, ApiClientError, string>({
+    mutationFn: (id) =>
+      apiClient.patch<StockItem>(`/stock-items/${id}/reactivate`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-items"] });
+    },
+  });
+}
+
+export function useDeleteStockItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation<{ message: string }, ApiClientError, string>({
+    mutationFn: (id) =>
+      apiClient.delete<{ message: string }>(`/stock-items/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stock-items"] });
     },

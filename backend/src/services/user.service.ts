@@ -264,6 +264,90 @@ export class UserService {
 
     return result.rows[0] as UserResponse;
   }
+
+  /**
+   * Deactivate a user (soft delete).
+   * Prevents the user from logging in.
+   */
+  async deactivate(id: string): Promise<UserResponse> {
+    const existing = await query('SELECT * FROM users WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      throw new UserServiceError('User not found', 404);
+    }
+    if (existing.rows[0].is_active === false) {
+      throw new UserServiceError('User is already inactive', 400);
+    }
+
+    const result = await query(
+      `UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1
+       RETURNING id, username, role, assigned_branch_id, failed_login_attempts,
+                 locked_until, last_activity, is_active, created_at, updated_at`,
+      [id]
+    );
+    return result.rows[0] as UserResponse;
+  }
+
+  /**
+   * Reactivate a user.
+   */
+  async reactivate(id: string): Promise<UserResponse> {
+    const existing = await query('SELECT * FROM users WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      throw new UserServiceError('User not found', 404);
+    }
+    if (existing.rows[0].is_active === true) {
+      throw new UserServiceError('User is already active', 400);
+    }
+
+    const result = await query(
+      `UPDATE users SET is_active = true, updated_at = NOW() WHERE id = $1
+       RETURNING id, username, role, assigned_branch_id, failed_login_attempts,
+                 locked_until, last_activity, is_active, created_at, updated_at`,
+      [id]
+    );
+    return result.rows[0] as UserResponse;
+  }
+
+  /**
+   * Hard delete a user.
+   * Only allowed if the user has no sale transactions or audit records.
+   */
+  async delete(id: string): Promise<void> {
+    const existing = await query('SELECT * FROM users WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      throw new UserServiceError('User not found', 404);
+    }
+
+    // Check for sale transactions created by this user
+    const salesCheck = await query(
+      'SELECT COUNT(*) as count FROM sale_transactions WHERE created_by = $1',
+      [id]
+    );
+    if (parseInt(salesCheck.rows[0].count, 10) > 0) {
+      throw new UserServiceError(
+        'Cannot delete user with existing sale history. Deactivate them instead.',
+        409
+      );
+    }
+
+    // Check for transfers initiated by this user
+    const transfersCheck = await query(
+      'SELECT COUNT(*) as count FROM stock_transfers WHERE initiated_by = $1',
+      [id]
+    );
+    if (parseInt(transfersCheck.rows[0].count, 10) > 0) {
+      throw new UserServiceError(
+        'Cannot delete user with existing transfer history. Deactivate them instead.',
+        409
+      );
+    }
+
+    // Remove audit records for this user (audit is informational, safe to cascade)
+    await query('DELETE FROM audit_records WHERE user_id = $1', [id]);
+
+    // Delete the user
+    await query('DELETE FROM users WHERE id = $1', [id]);
+  }
 }
 
 export const userService = new UserService();

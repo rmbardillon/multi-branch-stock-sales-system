@@ -8,6 +8,8 @@ import {
   useCreateBranch,
   useUpdateBranch,
   useDeactivateBranch,
+  useReactivateBranch,
+  useDeleteBranch,
   type Branch,
 } from "@/hooks/use-branches";
 import { BranchesTable } from "@/components/data-table/branches-table";
@@ -33,12 +35,14 @@ export default function BranchesPage() {
   const createBranch = useCreateBranch();
   const updateBranch = useUpdateBranch();
   const deactivateBranch = useDeactivateBranch();
+  const reactivateBranch = useReactivateBranch();
+  const deleteBranch = useDeleteBranch();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
-  const [deactivatingBranch, setDeactivatingBranch] = useState<Branch | null>(
-    null
-  );
+  const [deactivatingBranch, setDeactivatingBranch] = useState<Branch | null>(null);
+  const [deletingBranch, setDeletingBranch] = useState<Branch | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   function handleCreateClick() {
     setEditingBranch(null);
@@ -52,6 +56,15 @@ export default function BranchesPage() {
 
   function handleDeactivate(branch: Branch) {
     setDeactivatingBranch(branch);
+  }
+
+  function handleReactivate(branch: Branch) {
+    reactivateBranch.mutate(branch.id);
+  }
+
+  function handleDelete(branch: Branch) {
+    setDeleteError(null);
+    setDeletingBranch(branch);
   }
 
   async function handleFormSubmit(data: BranchFormValues) {
@@ -68,6 +81,21 @@ export default function BranchesPage() {
     if (deactivatingBranch) {
       await deactivateBranch.mutateAsync(deactivatingBranch.id);
       setDeactivatingBranch(null);
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (deletingBranch) {
+      try {
+        await deleteBranch.mutateAsync(deletingBranch.id);
+        setDeletingBranch(null);
+      } catch (err: unknown) {
+        if (err && typeof err === "object" && "message" in err) {
+          setDeleteError((err as { message: string }).message);
+        } else {
+          setDeleteError("Failed to delete branch.");
+        }
+      }
     }
   }
 
@@ -101,6 +129,8 @@ export default function BranchesPage() {
         isAdmin={isAdmin}
         onEdit={handleEdit}
         onDeactivate={handleDeactivate}
+        onReactivate={handleReactivate}
+        onDelete={handleDelete}
       />
 
       <BranchForm
@@ -136,6 +166,39 @@ export default function BranchesPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deactivateBranch.isPending ? "Deactivating..." : "Deactivate"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={!!deletingBranch}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletingBranch(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Branch Permanently</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete{" "}
+              <span className="font-semibold">{deletingBranch?.name}</span>.
+              This action cannot be undone. If this branch has any sales or
+              transfers, deletion will be blocked — deactivate it instead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <p className="text-sm text-destructive">{deleteError}</p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteBranch.isPending ? "Deleting..." : "Delete Permanently"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

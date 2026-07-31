@@ -205,6 +205,75 @@ export class BranchService {
   }
 
   /**
+   * Reactivate an inactive branch.
+   */
+  async reactivate(id: string): Promise<Branch> {
+    const existing = await query('SELECT * FROM branches WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      throw new BranchServiceError('Branch not found', 404);
+    }
+    if (existing.rows[0].status === 'Active') {
+      throw new BranchServiceError('Branch is already active', 400);
+    }
+
+    const result = await query(
+      `UPDATE branches SET status = 'Active', updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    return result.rows[0] as Branch;
+  }
+
+  /**
+   * Hard delete a branch.
+   * Only allowed if the branch has no sale transactions, stock transfers, or stock levels.
+   */
+  async delete(id: string): Promise<void> {
+    const existing = await query('SELECT * FROM branches WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      throw new BranchServiceError('Branch not found', 404);
+    }
+
+    // Check for sale transactions
+    const salesCheck = await query(
+      'SELECT COUNT(*) as count FROM sale_transactions WHERE branch_id = $1',
+      [id]
+    );
+    if (parseInt(salesCheck.rows[0].count, 10) > 0) {
+      throw new BranchServiceError(
+        'Cannot delete branch with existing sale history. Deactivate it instead.',
+        409
+      );
+    }
+
+    // Check for stock transfers
+    const transfersCheck = await query(
+      'SELECT COUNT(*) as count FROM stock_transfers WHERE source_branch_id = $1 OR destination_branch_id = $1',
+      [id]
+    );
+    if (parseInt(transfersCheck.rows[0].count, 10) > 0) {
+      throw new BranchServiceError(
+        'Cannot delete branch with existing transfer history. Deactivate it instead.',
+        409
+      );
+    }
+
+    // Remove stock levels
+    await query('DELETE FROM stock_levels WHERE branch_id = $1', [id]);
+
+    // Remove audit records for this branch
+    await query('DELETE FROM audit_records WHERE branch_id = $1', [id]);
+
+    // Unassign users from this branch
+    await query(
+      'UPDATE users SET assigned_branch_id = NULL, updated_at = NOW() WHERE assigned_branch_id = $1',
+      [id]
+    );
+
+    // Delete the branch
+    await query('DELETE FROM branches WHERE id = $1', [id]);
+  }
+
+  /**
    * Get a single branch by ID.
    * Throws 404 if not found.
    */

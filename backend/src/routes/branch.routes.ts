@@ -224,4 +224,76 @@ router.patch('/:id', requireAdmin(), async (req: Request, res: Response): Promis
   }
 });
 
+/**
+ * PATCH /api/branches/:id/reactivate
+ * Reactivate a branch.
+ * Admin only.
+ */
+router.patch('/:id/reactivate', requireAdmin(), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const branch = await branchService.reactivate(id);
+
+    auditLog(
+      req.user!.userId,
+      branch.id,
+      'branch_reactivated',
+      `Branch "${branch.name}" reactivated`,
+      { branch_id: branch.id, branch_name: branch.name }
+    );
+
+    res.status(200).json({ data: branch });
+  } catch (error) {
+    if (error instanceof BranchServiceError) {
+      res.status(error.statusCode).json({
+        error: error.statusCode === 404 ? 'Not found' : 'Error',
+        message: error.message,
+      });
+      return;
+    }
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to reactivate branch',
+    });
+  }
+});
+
+/**
+ * DELETE /api/branches/:id
+ * Hard delete a branch (only if no transaction history).
+ * Admin only.
+ */
+router.delete('/:id', requireAdmin(), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    // Get branch info for audit before deletion
+    const branch = await branchService.getById(id);
+
+    await branchService.delete(id);
+
+    auditLog(
+      req.user!.userId,
+      req.user!.assignedBranchId || null,
+      'branch_deleted',
+      `Branch "${branch.name}" permanently deleted`,
+      { deleted_branch_id: branch.id, branch_name: branch.name }
+    );
+
+    res.status(200).json({ message: 'Branch permanently deleted' });
+  } catch (error) {
+    if (error instanceof BranchServiceError) {
+      res.status(error.statusCode).json({
+        error: error.statusCode === 404 ? 'Not found' : error.statusCode === 409 ? 'Conflict' : 'Error',
+        message: error.message,
+      });
+      return;
+    }
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to delete branch',
+    });
+  }
+});
+
 export default router;

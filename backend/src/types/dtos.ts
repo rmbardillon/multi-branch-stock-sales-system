@@ -37,6 +37,7 @@ export interface UpdateStockItemDto {
   category?: string;
   unit_price?: number;
   low_stock_threshold?: number;
+  is_active?: boolean;
 }
 
 export interface CreateSaleLineItemDto {

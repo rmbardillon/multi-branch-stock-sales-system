@@ -29,7 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown, MoreHorizontal, Pencil, Ban } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Pencil, Ban, CheckCircle, Trash2 } from "lucide-react";
 import type { Branch } from "@/hooks/use-branches";
 
 interface BranchesTableProps {
@@ -37,6 +37,8 @@ interface BranchesTableProps {
   isAdmin: boolean;
   onEdit: (branch: Branch) => void;
   onDeactivate: (branch: Branch) => void;
+  onReactivate: (branch: Branch) => void;
+  onDelete: (branch: Branch) => void;
 }
 
 export function BranchesTable({
@@ -44,6 +46,8 @@ export function BranchesTable({
   isAdmin,
   onEdit,
   onDeactivate,
+  onReactivate,
+  onDelete,
 }: BranchesTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -134,6 +138,19 @@ export function BranchesTable({
                     Deactivate
                   </DropdownMenuItem>
                 )}
+                {branch.status === "Inactive" && (
+                  <DropdownMenuItem onClick={() => onReactivate(branch)}>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Reactivate
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem
+                  onClick={() => onDelete(branch)}
+                  className="text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           );
@@ -142,7 +159,7 @@ export function BranchesTable({
     }
 
     return cols;
-  }, [isAdmin, onEdit, onDeactivate]);
+  }, [isAdmin, onEdit, onDeactivate, onReactivate, onDelete]);
 
   const table = useReactTable({
     data,

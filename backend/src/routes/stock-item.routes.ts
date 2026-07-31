@@ -2,21 +2,26 @@ import { Router, Request, Response } from 'express';
 import { createStockItemSchema, updateStockItemSchema } from '../types/schemas';
 import { stockService, StockServiceError } from '../services/stock.service';
 import { requirePermission } from '../middleware/rbac.middleware';
+import { auditLog } from '../services/audit.service';
 import { query } from '../database/connection';
 
 const router = Router();
 
 /**
  * GET /api/stock-items
- * List all active stock items.
+ * List all stock items. By default returns active only.
+ * Pass ?includeInactive=true to include inactive items.
  * Requires: stock_item:read permission
  */
 router.get(
   '/',
   requirePermission('stock_item:read'),
-  async (_req: Request, res: Response): Promise<void> => {
+  async (req: Request, res: Response): Promise<void> => {
     try {
-      const items = await stockService.list();
+      const includeInactive = req.query.includeInactive === 'true';
+      const items = includeInactive
+        ? await stockService.listAll()
+        : await stockService.list();
       res.status(200).json(items);
     } catch (error) {
       res.status(500).json({
@@ -49,6 +54,15 @@ router.post(
       }
 
       const item = await stockService.createItem(parseResult.data);
+
+      auditLog(
+        req.user!.userId,
+        req.user!.assignedBranchId || null,
+        'stock_item_created',
+        `Stock item "${item.name}" (${item.sku}) created`,
+        { stock_item_id: item.id, sku: item.sku, name: item.name, category: item.category }
+      );
+
       res.status(201).json(item);
     } catch (error) {
       if (error instanceof StockServiceError) {
@@ -195,6 +209,15 @@ router.put(
       }
 
       const item = await stockService.updateItem(req.params.id, parseResult.data);
+
+      auditLog(
+        req.user!.userId,
+        req.user!.assignedBranchId || null,
+        'stock_item_updated',
+        `Stock item "${item.name}" (${item.sku}) updated`,
+        { stock_item_id: item.id, sku: item.sku, name: item.name, changes: Object.keys(parseResult.data) }
+      );
+
       res.status(200).json(item);
     } catch (error) {
       if (error instanceof StockServiceError) {
@@ -208,6 +231,118 @@ router.put(
       res.status(500).json({
         error: 'Internal server error',
         message: 'Failed to update stock item',
+      });
+    }
+  }
+);
+
+/**
+ * PATCH /api/stock-items/:id/deactivate
+ * Deactivate a stock item (soft delete).
+ * Requires: stock_item:write permission
+ */
+router.patch(
+  '/:id/deactivate',
+  requirePermission('stock_item:write'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const item = await stockService.deactivate(req.params.id);
+
+      auditLog(
+        req.user!.userId,
+        req.user!.assignedBranchId || null,
+        'stock_item_deactivated',
+        `Stock item "${item.name}" (${item.sku}) deactivated`,
+        { stock_item_id: item.id, sku: item.sku, name: item.name }
+      );
+
+      res.status(200).json(item);
+    } catch (error) {
+      if (error instanceof StockServiceError) {
+        res.status(error.statusCode).json({
+          error: error.statusCode === 404 ? 'Not found' : 'Error',
+          message: error.message,
+        });
+        return;
+      }
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Failed to deactivate stock item',
+      });
+    }
+  }
+);
+
+/**
+ * PATCH /api/stock-items/:id/reactivate
+ * Reactivate a stock item.
+ * Requires: stock_item:write permission
+ */
+router.patch(
+  '/:id/reactivate',
+  requirePermission('stock_item:write'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const item = await stockService.reactivate(req.params.id);
+
+      auditLog(
+        req.user!.userId,
+        req.user!.assignedBranchId || null,
+        'stock_item_reactivated',
+        `Stock item "${item.name}" (${item.sku}) reactivated`,
+        { stock_item_id: item.id, sku: item.sku, name: item.name }
+      );
+
+      res.status(200).json(item);
+    } catch (error) {
+      if (error instanceof StockServiceError) {
+        res.status(error.statusCode).json({
+          error: error.statusCode === 404 ? 'Not found' : 'Error',
+          message: error.message,
+        });
+        return;
+      }
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Failed to reactivate stock item',
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /api/stock-items/:id
+ * Hard delete a stock item (only if no transaction history).
+ * Requires: stock_item:write permission
+ */
+router.delete(
+  '/:id',
+  requirePermission('stock_item:write'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const item = await stockService.getById(req.params.id);
+      await stockService.delete(req.params.id);
+
+      auditLog(
+        req.user!.userId,
+        req.user!.assignedBranchId || null,
+        'stock_item_deleted',
+        `Stock item "${item?.name}" (${item?.sku}) permanently deleted`,
+        { stock_item_id: req.params.id, sku: item?.sku, name: item?.name }
+      );
+
+      res.status(200).json({ message: 'Stock item permanently deleted' });
+    } catch (error) {
+      if (error instanceof StockServiceError) {
+        res.status(error.statusCode).json({
+          error: error.statusCode === 404 ? 'Not found' : error.statusCode === 409 ? 'Conflict' : 'Error',
+          message: error.message,
+        });
+        return;
+      }
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Failed to delete stock item',
       });
     }
   }

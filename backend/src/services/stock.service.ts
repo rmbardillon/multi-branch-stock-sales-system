@@ -305,6 +305,17 @@ export class StockService {
   }
 
   /**
+   * List all stock items (including inactive).
+   */
+  async listAll(): Promise<StockItem[]> {
+    const result = await query(
+      'SELECT * FROM stock_items ORDER BY name ASC'
+    );
+
+    return result.rows;
+  }
+
+  /**
    * Adjust stock quantity for a specific item at a specific branch.
    * Positive quantity adds stock, negative quantity removes stock.
    * Creates the stock_levels row if it doesn't exist (for positive adjustments).
@@ -370,6 +381,84 @@ export class StockService {
       new_quantity: newQuantity,
       adjustment,
     };
+  }
+  /**
+   * Deactivate a stock item (soft delete).
+   */
+  async deactivate(id: string): Promise<StockItem> {
+    const existing = await query('SELECT * FROM stock_items WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      throw new StockServiceError('Stock item not found', 404);
+    }
+    if (existing.rows[0].is_active === false) {
+      throw new StockServiceError('Stock item is already inactive', 400);
+    }
+
+    const result = await query(
+      `UPDATE stock_items SET is_active = false, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    return result.rows[0];
+  }
+
+  /**
+   * Reactivate a stock item.
+   */
+  async reactivate(id: string): Promise<StockItem> {
+    const existing = await query('SELECT * FROM stock_items WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      throw new StockServiceError('Stock item not found', 404);
+    }
+    if (existing.rows[0].is_active === true) {
+      throw new StockServiceError('Stock item is already active', 400);
+    }
+
+    const result = await query(
+      `UPDATE stock_items SET is_active = true, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    return result.rows[0];
+  }
+
+  /**
+   * Hard delete a stock item.
+   * Only allowed if the item has no sale line items or transfer line items.
+   */
+  async delete(id: string): Promise<void> {
+    const existing = await query('SELECT * FROM stock_items WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      throw new StockServiceError('Stock item not found', 404);
+    }
+
+    // Check for sale line items referencing this stock item
+    const salesCheck = await query(
+      'SELECT COUNT(*) as count FROM sale_line_items WHERE stock_item_id = $1',
+      [id]
+    );
+    if (parseInt(salesCheck.rows[0].count, 10) > 0) {
+      throw new StockServiceError(
+        'Cannot delete stock item with existing sale history. Deactivate it instead.',
+        409
+      );
+    }
+
+    // Check for transfer line items referencing this stock item
+    const transfersCheck = await query(
+      'SELECT COUNT(*) as count FROM transfer_line_items WHERE stock_item_id = $1',
+      [id]
+    );
+    if (parseInt(transfersCheck.rows[0].count, 10) > 0) {
+      throw new StockServiceError(
+        'Cannot delete stock item with existing transfer history. Deactivate it instead.',
+        409
+      );
+    }
+
+    // Remove stock levels first (FK constraint)
+    await query('DELETE FROM stock_levels WHERE stock_item_id = $1', [id]);
+
+    // Delete the stock item
+    await query('DELETE FROM stock_items WHERE id = $1', [id]);
   }
 }
 

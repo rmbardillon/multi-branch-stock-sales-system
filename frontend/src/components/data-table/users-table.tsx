@@ -29,7 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown, MoreHorizontal, Pencil, Shield } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Pencil, Shield, Ban, CheckCircle, Trash2 } from "lucide-react";
 import type { User } from "@/hooks/use-users";
 import type { Branch } from "@/hooks/use-branches";
 
@@ -38,6 +38,9 @@ interface UsersTableProps {
   branches: Branch[];
   onEdit: (user: User) => void;
   onAssignRole: (user: User) => void;
+  onDeactivate: (user: User) => void;
+  onReactivate: (user: User) => void;
+  onDelete: (user: User) => void;
 }
 
 function formatRole(role: string): string {
@@ -70,6 +73,9 @@ export function UsersTable({
   branches,
   onEdit,
   onAssignRole,
+  onDeactivate,
+  onReactivate,
+  onDelete,
 }: UsersTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -187,13 +193,34 @@ export function UsersTable({
                   <Shield className="mr-2 h-4 w-4" />
                   Assign Role
                 </DropdownMenuItem>
+                {user.is_active ? (
+                  <DropdownMenuItem
+                    onClick={() => onDeactivate(user)}
+                    className="text-destructive"
+                  >
+                    <Ban className="mr-2 h-4 w-4" />
+                    Deactivate
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={() => onReactivate(user)}>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Reactivate
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem
+                  onClick={() => onDelete(user)}
+                  className="text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           );
         },
       },
     ],
-    [branchMap, onEdit, onAssignRole]
+    [branchMap, onEdit, onAssignRole, onDeactivate, onReactivate, onDelete]
   );
 
   const table = useReactTable({

@@ -11,7 +11,7 @@ import {
   useReactTable,
   SortingState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, Pencil } from "lucide-react";
+import { ArrowUpDown, Pencil, MoreHorizontal, Ban, CheckCircle, Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -21,18 +21,31 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { StockItem } from "@/hooks/use-stock-items";
 import { formatCurrency } from "@/lib/currency";
 
 interface StockItemsTableProps {
   data: StockItem[];
   onEdit?: (item: StockItem) => void;
+  onDeactivate?: (item: StockItem) => void;
+  onReactivate?: (item: StockItem) => void;
+  onDelete?: (item: StockItem) => void;
   canWrite?: boolean;
 }
 
 export function StockItemsTable({
   data,
   onEdit,
+  onDeactivate,
+  onReactivate,
+  onDelete,
   canWrite = false,
 }: StockItemsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -102,21 +115,63 @@ export function StockItemsTable({
         </Button>
       ),
     },
+    {
+      accessorKey: "is_active",
+      header: "Status",
+      cell: ({ row }) => {
+        const isActive = row.getValue("is_active") as boolean;
+        return (
+          <Badge variant={isActive ? "success" : "secondary"}>
+            {isActive ? "Active" : "Inactive"}
+          </Badge>
+        );
+      },
+    },
     ...(canWrite
       ? [
           {
             id: "actions",
             header: () => <span>Actions</span>,
-            cell: ({ row }: { row: { original: StockItem } }) => (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onEdit?.(row.original)}
-              >
-                <Pencil className="h-4 w-4 mr-1" />
-                Edit
-              </Button>
-            ),
+            cell: ({ row }: { row: { original: StockItem } }) => {
+              const item = row.original;
+              return (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 p-0">
+                      <span className="sr-only">Open menu</span>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onEdit?.(item)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                    {item.is_active ? (
+                      <DropdownMenuItem
+                        onClick={() => onDeactivate?.(item)}
+                        className="text-destructive"
+                      >
+                        <Ban className="mr-2 h-4 w-4" />
+                        Deactivate
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem onClick={() => onReactivate?.(item)}>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Reactivate
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      onClick={() => onDelete?.(item)}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              );
+            },
           } as ColumnDef<StockItem>,
         ]
       : []),

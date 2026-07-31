@@ -88,3 +88,44 @@ export function useAssignRole() {
     },
   });
 }
+
+export function useDeactivateUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation<User, Error, string>({
+    mutationFn: async (id) => {
+      const response = await apiClient.patch<{ data: User }>(`/users/${id}/deactivate`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
+    },
+  });
+}
+
+export function useReactivateUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation<User, Error, string>({
+    mutationFn: async (id) => {
+      const response = await apiClient.patch<{ data: User }>(`/users/${id}/reactivate`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
+    },
+  });
+}
+
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation<{ message: string }, Error, string>({
+    mutationFn: async (id) => {
+      return apiClient.delete<{ message: string }>(`/users/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
+    },
+  });
+}

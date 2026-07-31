@@ -92,3 +92,30 @@ export function useDeactivateBranch() {
     },
   });
 }
+
+export function useReactivateBranch() {
+  const queryClient = useQueryClient();
+
+  return useMutation<Branch, Error, string>({
+    mutationFn: async (id) => {
+      const response = await apiClient.patch<{ data: Branch }>(`/branches/${id}/reactivate`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: BRANCHES_QUERY_KEY });
+    },
+  });
+}
+
+export function useDeleteBranch() {
+  const queryClient = useQueryClient();
+
+  return useMutation<{ message: string }, Error, string>({
+    mutationFn: async (id) => {
+      return apiClient.delete<{ message: string }>(`/branches/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: BRANCHES_QUERY_KEY });
+    },
+  });
+}

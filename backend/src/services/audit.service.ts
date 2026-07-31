@@ -6,15 +6,25 @@ import type { AuditRecord } from '../types/entities';
  */
 export type AuditActionType =
   | 'stock_adjustment'
+  | 'stock_item_created'
+  | 'stock_item_updated'
+  | 'stock_item_deactivated'
+  | 'stock_item_reactivated'
+  | 'stock_item_deleted'
   | 'sale_created'
   | 'transfer_initiated'
   | 'transfer_confirmed'
   | 'transfer_failed'
   | 'user_created'
   | 'user_updated'
+  | 'user_deactivated'
+  | 'user_reactivated'
+  | 'user_deleted'
   | 'branch_created'
   | 'branch_updated'
-  | 'branch_deactivated';
+  | 'branch_deactivated'
+  | 'branch_reactivated'
+  | 'branch_deleted';
 
 export interface AuditEntry {
   userId: string;

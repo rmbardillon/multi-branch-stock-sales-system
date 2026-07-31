@@ -9,9 +9,22 @@ import { StockItemFormDialog } from "@/components/forms/stock-item-form";
 import {
   useStockItems,
   useSearchStockItems,
+  useDeactivateStockItem,
+  useReactivateStockItem,
+  useDeleteStockItem,
   type StockItem,
 } from "@/hooks/use-stock-items";
 import { useAuthContext } from "@/providers/auth-provider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -37,11 +50,19 @@ export default function StockItemsPage() {
 
   const debouncedSearch = useDebounce(searchQuery, 300);
 
+  const deactivateItem = useDeactivateStockItem();
+  const reactivateItem = useReactivateStockItem();
+  const deleteItem = useDeleteStockItem();
+
+  const [deactivatingItem, setDeactivatingItem] = useState<StockItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<StockItem | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const {
     data: allItems,
     isLoading: isLoadingAll,
     error: allItemsError,
-  } = useStockItems();
+  } = useStockItems(true);
 
   const {
     data: searchResults,
@@ -72,6 +93,41 @@ export default function StockItemsPage() {
       setEditingItem(null);
     }
   }, []);
+
+  const handleDeactivate = useCallback((item: StockItem) => {
+    setDeactivatingItem(item);
+  }, []);
+
+  const handleReactivate = useCallback((item: StockItem) => {
+    reactivateItem.mutate(item.id);
+  }, [reactivateItem]);
+
+  const handleDelete = useCallback((item: StockItem) => {
+    setDeleteError(null);
+    setDeletingItem(item);
+  }, []);
+
+  async function handleConfirmDeactivate() {
+    if (deactivatingItem) {
+      await deactivateItem.mutateAsync(deactivatingItem.id);
+      setDeactivatingItem(null);
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (deletingItem) {
+      try {
+        await deleteItem.mutateAsync(deletingItem.id);
+        setDeletingItem(null);
+      } catch (err: unknown) {
+        if (err && typeof err === "object" && "message" in err) {
+          setDeleteError((err as { message: string }).message);
+        } else {
+          setDeleteError("Failed to delete stock item.");
+        }
+      }
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -120,6 +176,9 @@ export default function StockItemsPage() {
         <StockItemsTable
           data={displayData}
           onEdit={handleEdit}
+          onDeactivate={handleDeactivate}
+          onReactivate={handleReactivate}
+          onDelete={handleDelete}
           canWrite={canWrite}
         />
       )}
@@ -130,6 +189,70 @@ export default function StockItemsPage() {
         onOpenChange={handleDialogClose}
         stockItem={editingItem}
       />
+
+      {/* Deactivate confirmation */}
+      <AlertDialog
+        open={!!deactivatingItem}
+        onOpenChange={(open) => {
+          if (!open) setDeactivatingItem(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate Stock Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to deactivate{" "}
+              <span className="font-semibold">{deactivatingItem?.name}</span> ({deactivatingItem?.sku})?
+              It will no longer appear in POS, sales, or inventory views.
+              You can reactivate it later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeactivate}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deactivateItem.isPending ? "Deactivating..." : "Deactivate"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog
+        open={!!deletingItem}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletingItem(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Stock Item Permanently</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete{" "}
+              <span className="font-semibold">{deletingItem?.name}</span> ({deletingItem?.sku}).
+              This action cannot be undone. If this item has any sales or
+              transfer history, deletion will be blocked — deactivate it instead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <p className="text-sm text-destructive">{deleteError}</p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteItem.isPending ? "Deleting..." : "Delete Permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
