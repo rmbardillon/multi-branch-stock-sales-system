@@ -8,6 +8,7 @@ import { useInventory } from "@/hooks/use-inventory";
 import { useCreateSale } from "@/hooks/use-sales";
 import { fetchStockItemBySku, useSearchStockItems, type StockItem } from "@/hooks/use-stock-items";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
+import { formatCurrency } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -344,7 +345,7 @@ export default function PosPage() {
                 <tr>
                   <td>${li.name}<br><small>${li.sku}</small></td>
                   <td class="qty">${li.quantity}</td>
-                  <td class="price">$${(li.quantity * li.unit_price).toFixed(2)}</td>
+                  <td class="price">${formatCurrency(li.quantity * li.unit_price)}</td>
                 </tr>`
                 )
                 .join("")}
@@ -354,7 +355,7 @@ export default function PosPage() {
           <table>
             <tr class="total-row">
               <td>TOTAL</td>
-              <td class="price">$${receiptTotal.toFixed(2)}</td>
+              <td class="price">${formatCurrency(receiptTotal)}</td>
             </tr>
             <tr>
               <td>Items</td>
@@ -563,10 +564,10 @@ export default function PosPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        ${li.unit_price.toFixed(2)}
+                        {formatCurrency(li.unit_price)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-medium">
-                        ${(li.quantity * li.unit_price).toFixed(2)}
+                        {formatCurrency(li.quantity * li.unit_price)}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -603,7 +604,7 @@ export default function PosPage() {
             <div className="border-t pt-3 flex justify-between">
               <span className="font-semibold">Total</span>
               <span className="text-xl font-bold tabular-nums">
-                ${total.toFixed(2)}
+                {formatCurrency(total)}
               </span>
             </div>
           </div>
@@ -686,7 +687,7 @@ export default function PosPage() {
                       </td>
                       <td className="p-2 text-center">{li.quantity}</td>
                       <td className="p-2 text-right tabular-nums">
-                        ${(li.quantity * li.unit_price).toFixed(2)}
+                        {formatCurrency(li.quantity * li.unit_price)}
                       </td>
                     </tr>
                   ))}
@@ -698,7 +699,7 @@ export default function PosPage() {
           <div className="flex justify-between items-center px-1">
             <span className="text-sm text-muted-foreground">Total</span>
             <span className="text-lg font-bold tabular-nums">
-              ${completedItems.reduce((s, li) => s + li.quantity * li.unit_price, 0).toFixed(2)}
+              {formatCurrency(completedItems.reduce((s, li) => s + li.quantity * li.unit_price, 0))}
             </span>
           </div>
 
