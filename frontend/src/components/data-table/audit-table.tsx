@@ -85,7 +85,7 @@ export function AuditTable({
       },
     },
     {
-      accessorKey: "user_id",
+      accessorKey: "user_name",
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -96,13 +96,13 @@ export function AuditTable({
         </Button>
       ),
       cell: ({ row }) => (
-        <span className="font-mono text-xs">
-          {row.getValue<string>("user_id").slice(0, 8)}...
+        <span className="text-sm">
+          {row.original.user_name || row.original.user_id.slice(0, 8) + "..."}
         </span>
       ),
     },
     {
-      accessorKey: "branch_id",
+      accessorKey: "branch_name",
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -113,8 +113,8 @@ export function AuditTable({
         </Button>
       ),
       cell: ({ row }) => (
-        <span className="font-mono text-xs">
-          {row.getValue<string>("branch_id").slice(0, 8)}...
+        <span className="text-sm">
+          {row.original.branch_name || (row.original.branch_id ? row.original.branch_id.slice(0, 8) + "..." : "—")}
         </span>
       ),
     },
@@ -142,7 +142,7 @@ export function AuditTable({
       accessorKey: "description",
       header: "Description",
       cell: ({ row }) => (
-        <span className="text-sm max-w-[300px] truncate block">
+        <span className="text-sm max-w-[400px] block">
           {row.getValue<string>("description")}
         </span>
       ),

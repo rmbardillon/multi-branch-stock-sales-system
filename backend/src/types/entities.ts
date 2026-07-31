@@ -93,4 +93,6 @@ export interface AuditRecord {
   description: string;
   metadata: Record<string, unknown> | null;
   created_at: Date;
+  user_name?: string | null;
+  branch_name?: string | null;
 }

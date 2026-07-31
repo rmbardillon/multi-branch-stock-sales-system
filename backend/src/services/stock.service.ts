@@ -30,6 +30,14 @@ export interface LowStockAlert {
   low_stock_threshold: number;
 }
 
+export interface StockAdjustmentResult {
+  stock_item_id: string;
+  branch_id: string;
+  previous_quantity: number;
+  new_quantity: number;
+  adjustment: number;
+}
+
 export class StockServiceError extends Error {
   public statusCode: number;
 
@@ -294,6 +302,74 @@ export class StockService {
     );
 
     return result.rows;
+  }
+
+  /**
+   * Adjust stock quantity for a specific item at a specific branch.
+   * Positive quantity adds stock, negative quantity removes stock.
+   * Creates the stock_levels row if it doesn't exist (for positive adjustments).
+   * Rejects negative adjustments that would result in quantity < 0.
+   */
+  async adjustStock(
+    branchId: string,
+    stockItemId: string,
+    adjustment: number
+  ): Promise<StockAdjustmentResult> {
+    // Validate the stock item exists and is active
+    const itemResult = await query(
+      'SELECT id FROM stock_items WHERE id = $1 AND is_active = true',
+      [stockItemId]
+    );
+
+    if (itemResult.rows.length === 0) {
+      throw new StockServiceError('Stock item not found or inactive', 404);
+    }
+
+    // Validate the branch exists and is active
+    const branchResult = await query(
+      "SELECT id FROM branches WHERE id = $1 AND status = 'Active'",
+      [branchId]
+    );
+
+    if (branchResult.rows.length === 0) {
+      throw new StockServiceError('Branch not found or inactive', 404);
+    }
+
+    // Get current stock level (may not exist yet)
+    const currentLevel = await query(
+      'SELECT quantity FROM stock_levels WHERE branch_id = $1 AND stock_item_id = $2',
+      [branchId, stockItemId]
+    );
+
+    const previousQuantity = currentLevel.rows.length > 0
+      ? currentLevel.rows[0].quantity
+      : 0;
+
+    const newQuantity = previousQuantity + adjustment;
+
+    if (newQuantity < 0) {
+      throw new StockServiceError(
+        `Adjustment would result in negative stock. Current: ${previousQuantity}, adjustment: ${adjustment}`,
+        422
+      );
+    }
+
+    // Upsert stock level
+    await query(
+      `INSERT INTO stock_levels (branch_id, stock_item_id, quantity, last_updated)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (branch_id, stock_item_id)
+       DO UPDATE SET quantity = $3, last_updated = NOW()`,
+      [branchId, stockItemId, newQuantity]
+    );
+
+    return {
+      stock_item_id: stockItemId,
+      branch_id: branchId,
+      previous_quantity: previousQuantity,
+      new_quantity: newQuantity,
+      adjustment,
+    };
   }
 }
 

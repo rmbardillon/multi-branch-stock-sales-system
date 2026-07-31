@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { createUserSchema, updateUserSchema } from '../types/schemas';
 import { userService, UserServiceError } from '../services/user.service';
 import { requireAdmin } from '../middleware/rbac.middleware';
+import { auditLog } from '../services/audit.service';
 import type { Role } from '../types/entities';
 
 const router = Router();
@@ -42,6 +43,21 @@ router.post('/', requireAdmin(), async (req: Request, res: Response): Promise<vo
     }
 
     const user = await userService.create(parseResult.data);
+
+    // Log audit trail
+    auditLog(
+      req.user!.userId,
+      user.assigned_branch_id || req.user!.assignedBranchId || null,
+      'user_created',
+      `User "${user.username}" created with role ${user.role}`,
+      {
+        created_user_id: user.id,
+        username: user.username,
+        role: user.role,
+        assigned_branch_id: user.assigned_branch_id,
+      }
+    );
+
     res.status(201).json({ data: user });
   } catch (error) {
     if (error instanceof UserServiceError) {
@@ -106,6 +122,20 @@ router.put('/:id', requireAdmin(), async (req: Request, res: Response): Promise<
     }
 
     const user = await userService.update(id, parseResult.data);
+
+    // Log audit trail
+    auditLog(
+      req.user!.userId,
+      user.assigned_branch_id || req.user!.assignedBranchId || null,
+      'user_updated',
+      `User "${user.username}" updated`,
+      {
+        updated_user_id: user.id,
+        username: user.username,
+        changes: Object.keys(parseResult.data),
+      }
+    );
+
     res.status(200).json({ data: user });
   } catch (error) {
     if (error instanceof UserServiceError) {
@@ -148,6 +178,21 @@ router.put('/:id/role', requireAdmin(), async (req: Request, res: Response): Pro
     }
 
     const user = await userService.assignRole(id, role as Role, assigned_branch_id);
+
+    // Log audit trail
+    auditLog(
+      req.user!.userId,
+      user.assigned_branch_id || req.user!.assignedBranchId || null,
+      'user_updated',
+      `User "${user.username}" role changed to ${role}`,
+      {
+        updated_user_id: user.id,
+        username: user.username,
+        new_role: role,
+        assigned_branch_id: user.assigned_branch_id,
+      }
+    );
+
     res.status(200).json({ data: user });
   } catch (error) {
     if (error instanceof UserServiceError) {

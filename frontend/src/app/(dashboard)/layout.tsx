@@ -9,6 +9,7 @@ import {
   Package,
   Warehouse,
   ShoppingCart,
+  ScanBarcode,
   ArrowLeftRight,
   FileText,
   Users,
@@ -56,6 +57,12 @@ const navItems: NavItem[] = [
     label: "Sales",
     href: "/sales",
     icon: ShoppingCart,
+    roles: ["Admin", "Branch_Manager", "Sales_Staff"],
+  },
+  {
+    label: "POS",
+    href: "/pos",
+    icon: ScanBarcode,
     roles: ["Admin", "Branch_Manager", "Sales_Staff"],
   },
   {

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { Shield, FileText } from "lucide-react";
+import { Shield, FileText, AlertCircle } from "lucide-react";
 import { useAuthContext } from "@/providers/auth-provider";
 import { useBranches } from "@/hooks/use-branches";
 import { useAuditTrail, type AuditFilters } from "@/hooks/use-audit";
@@ -51,7 +51,7 @@ export default function AuditPage() {
   const { user } = useAuthContext();
   const isAdmin = user?.role === "Admin";
 
-  const { data: branches = [] } = useBranches();
+  const { data: branches = [] } = useBranches({ status: "Active" });
 
   const defaults = getDefaultDateRange();
   const [startDate, setStartDate] = useState(defaults.startDate);
@@ -60,7 +60,11 @@ export default function AuditPage() {
   const [actionType, setActionType] = useState<string>("all");
   const [userId, setUserId] = useState("");
 
-  const [activeFilters, setActiveFilters] = useState<AuditFilters | null>(null);
+  const [activeFilters, setActiveFilters] = useState<AuditFilters | null>({
+    startDate: defaults.startDate,
+    endDate: defaults.endDate,
+    pageSize: 50,
+  });
   const [currentPage, setCurrentPage] = useState(1);
 
   const auditQuery = useAuditTrail(
@@ -212,6 +216,16 @@ export default function AuditPage() {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Query Error */}
+      {auditQuery.error && (
+        <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>
+            {auditQuery.error.message || "Failed to load audit records. Please try again."}
+          </span>
+        </div>
       )}
 
       {/* Audit Table */}

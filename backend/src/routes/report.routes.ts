@@ -29,7 +29,7 @@ router.get(
       }
 
       const parsedStartDate = new Date(startDate as string);
-      const parsedEndDate = new Date(endDate as string);
+      const parsedEndDate = new Date((endDate as string) + 'T23:59:59.999Z');
 
       if (isNaN(parsedStartDate.getTime()) || isNaN(parsedEndDate.getTime())) {
         res.status(400).json({
@@ -100,7 +100,7 @@ router.get(
       }
 
       const parsedStartDate = startDate ? new Date(startDate as string) : undefined;
-      const parsedEndDate = endDate ? new Date(endDate as string) : undefined;
+      const parsedEndDate = endDate ? new Date((endDate as string) + 'T23:59:59.999Z') : undefined;
 
       if (parsedStartDate && isNaN(parsedStartDate.getTime())) {
         res.status(400).json({
@@ -192,7 +192,7 @@ router.get(
         }
 
         const parsedStartDate = new Date(startDate as string);
-        const parsedEndDate = new Date(endDate as string);
+        const parsedEndDate = new Date((endDate as string) + 'T23:59:59.999Z');
 
         if (isNaN(parsedStartDate.getTime()) || isNaN(parsedEndDate.getTime())) {
           res.status(400).json({
@@ -224,7 +224,7 @@ router.get(
       } else {
         // Stock report
         const parsedStartDate = startDate ? new Date(startDate as string) : undefined;
-        const parsedEndDate = endDate ? new Date(endDate as string) : undefined;
+        const parsedEndDate = endDate ? new Date((endDate as string) + 'T23:59:59.999Z') : undefined;
 
         if (parsedStartDate && isNaN(parsedStartDate.getTime())) {
           res.status(400).json({

@@ -17,13 +17,17 @@ import { useSales, type SaleTransaction } from "@/hooks/use-sales";
 
 function getStartOfMonth(): string {
   const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1)
-    .toISOString()
-    .split("T")[0];
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}-01`;
 }
 
 function getToday(): string {
-  return new Date().toISOString().split("T")[0];
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function formatCurrency(amount: number): string {
@@ -62,11 +66,10 @@ export default function DashboardPage() {
   const { data: alerts } = useLowStockAlerts(alertsBranchId);
 
   // Recent transactions (20 most recent)
-  // For Admin without an assigned branch, we skip this query since there's no
-  // "all" branch endpoint on the backend.
-  const recentBranchId = isAdmin ? branchId : branchId;
+  // For Admin without an assigned branch, fetch all branches' sales is not
+  // supported by the single-branch endpoint, so we show a message instead.
   const { data: recentSalesData, isLoading: recentLoading } = useSales(
-    recentBranchId || null,
+    branchId || null,
     { pageSize: 20 }
   );
 
@@ -193,7 +196,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="ml-4 shrink-0 font-semibold">
-                      {formatCurrency(tx.total_amount)}
+                      {formatCurrency(Number(tx.total_amount))}
                     </div>
                   </div>
                 ))}

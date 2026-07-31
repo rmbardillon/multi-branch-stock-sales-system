@@ -35,7 +35,7 @@ router.get(
       }
 
       if (endDate) {
-        parsedEndDate = new Date(endDate as string);
+        parsedEndDate = new Date((endDate as string) + 'T23:59:59.999Z');
         if (isNaN(parsedEndDate.getTime())) {
           res.status(400).json({
             error: 'Validation error',

@@ -78,3 +78,23 @@ export function useUpdateStockItem() {
     },
   });
 }
+
+/**
+ * Fetch a single stock item by exact SKU (case-insensitive).
+ * Used by the POS page for barcode scanner lookups.
+ * Returns null if not found.
+ */
+export async function fetchStockItemBySku(
+  sku: string
+): Promise<StockItem | null> {
+  try {
+    return await apiClient.get<StockItem>(
+      `/stock-items/sku/${encodeURIComponent(sku)}`
+    );
+  } catch (err) {
+    if (err instanceof ApiClientError && err.statusCode === 404) {
+      return null;
+    }
+    throw err;
+  }
+}

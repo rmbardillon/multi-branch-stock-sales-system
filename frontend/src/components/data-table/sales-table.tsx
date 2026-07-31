@@ -9,6 +9,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
+import { ArrowUpDown, Eye } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -17,8 +18,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import type { SaleTransaction } from "@/hooks/use-sales";
 
 interface SalesTableProps {
@@ -37,6 +45,7 @@ export function SalesTable({
   onPageChange,
 }: SalesTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [selectedSale, setSelectedSale] = React.useState<SaleTransaction | null>(null);
 
   const pageCount = Math.ceil(total / pageSize);
 
@@ -101,7 +110,7 @@ export function SalesTable({
         cell: ({ row }) => {
           const amount = parseFloat(row.getValue("total_amount"));
           return (
-            <span className="font-medium">
+            <span className="font-medium tabular-nums">
               {new Intl.NumberFormat(undefined, {
                 style: "currency",
                 currency: "USD",
@@ -112,11 +121,28 @@ export function SalesTable({
       },
       {
         accessorKey: "line_items",
-        header: "# Items",
+        header: "Items",
         cell: ({ row }) => {
           const lineItems = row.original.line_items;
-          return lineItems ? lineItems.length : "—";
+          return (
+            <Badge variant="secondary">
+              {lineItems ? lineItems.length : 0}
+            </Badge>
+          );
         },
+      },
+      {
+        id: "actions",
+        header: "",
+        cell: ({ row }) => (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedSale(row.original)}
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+        ),
       },
     ],
     []
@@ -158,7 +184,11 @@ export function SalesTable({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={row.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => setSelectedSale(row.original)}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(
@@ -182,9 +212,11 @@ export function SalesTable({
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
       <div className="flex items-center justify-between px-2">
         <div className="text-sm text-muted-foreground">
-          Showing {(page - 1) * pageSize + 1}-
+          Showing {total > 0 ? (page - 1) * pageSize + 1 : 0}-
           {Math.min(page * pageSize, total)} of {total} transactions
         </div>
         <div className="flex items-center space-x-2">
@@ -209,6 +241,111 @@ export function SalesTable({
           </Button>
         </div>
       </div>
+
+      {/* Sale Detail Dialog */}
+      <Dialog open={!!selectedSale} onOpenChange={() => setSelectedSale(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Sale Details</DialogTitle>
+            <DialogDescription>
+              {selectedSale && (
+                <span className="font-mono">{selectedSale.reference_number}</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedSale && (
+            <div className="space-y-4">
+              {/* Sale metadata */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Date</span>
+                  <p className="font-medium">
+                    {new Date(selectedSale.transaction_date).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Total</span>
+                  <p className="font-medium text-lg tabular-nums">
+                    {new Intl.NumberFormat(undefined, {
+                      style: "currency",
+                      currency: "USD",
+                    }).format(Number(selectedSale.total_amount))}
+                  </p>
+                </div>
+              </div>
+
+              {/* Line items */}
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead className="w-16 text-center">Qty</TableHead>
+                      <TableHead className="w-24 text-right">Price</TableHead>
+                      <TableHead className="w-24 text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedSale.line_items && selectedSale.line_items.length > 0 ? (
+                      selectedSale.line_items.map((li) => (
+                        <TableRow key={li.id}>
+                          <TableCell>
+                            <div className="font-medium">
+                              {li.stock_item_name || "Unknown Item"}
+                            </div>
+                            {li.stock_item_sku && (
+                              <div className="text-xs text-muted-foreground font-mono">
+                                {li.stock_item_sku}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center tabular-nums">
+                            {li.quantity}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            ${Number(li.unit_price).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums font-medium">
+                            ${Number(li.line_total).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground">
+                          No line items available.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Total summary */}
+              {selectedSale.line_items && selectedSale.line_items.length > 0 && (
+                <div className="flex justify-between items-center px-2 pt-2 border-t">
+                  <span className="text-sm text-muted-foreground">
+                    {selectedSale.line_items.reduce((s, li) => s + li.quantity, 0)} items total
+                  </span>
+                  <span className="font-bold text-lg tabular-nums">
+                    {new Intl.NumberFormat(undefined, {
+                      style: "currency",
+                      currency: "USD",
+                    }).format(Number(selectedSale.total_amount))}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

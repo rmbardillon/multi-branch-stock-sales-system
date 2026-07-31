@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient, ApiClientError } from "@/lib/api-client";
 
 export interface StockLevelItem {
@@ -114,5 +114,40 @@ export function useLowStockAlerts(branchId?: string | null) {
       }));
     },
     refetchInterval: REFETCH_INTERVAL,
+  });
+}
+
+export interface AdjustStockInput {
+  stock_item_id: string;
+  adjustment: number;
+  reason: string;
+}
+
+export interface StockAdjustmentResult {
+  stock_item_id: string;
+  branch_id: string;
+  previous_quantity: number;
+  new_quantity: number;
+  adjustment: number;
+}
+
+/**
+ * Adjust stock quantity for an item at a specific branch.
+ * Invalidates inventory queries on success so the table refreshes.
+ */
+export function useAdjustStock(branchId: string | null | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation<StockAdjustmentResult, ApiClientError, AdjustStockInput>({
+    mutationFn: (data) =>
+      apiClient.post<StockAdjustmentResult>(
+        `/inventory/${branchId}/adjust`,
+        data
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ALERTS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: CONSOLIDATED_QUERY_KEY });
+    },
   });
 }

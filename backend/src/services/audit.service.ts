@@ -18,7 +18,7 @@ export type AuditActionType =
 
 export interface AuditEntry {
   userId: string;
-  branchId: string;
+  branchId: string | null;
   actionType: AuditActionType | string;
   description: string;
   metadata?: Record<string, unknown>;
@@ -124,31 +124,31 @@ export class AuditService {
     let paramIndex = 1;
 
     if (filters.startDate) {
-      conditions.push(`created_at >= $${paramIndex}`);
+      conditions.push(`ar.created_at >= $${paramIndex}`);
       params.push(filters.startDate instanceof Date ? filters.startDate.toISOString() : filters.startDate);
       paramIndex++;
     }
 
     if (filters.endDate) {
-      conditions.push(`created_at <= $${paramIndex}`);
+      conditions.push(`ar.created_at <= $${paramIndex}`);
       params.push(filters.endDate instanceof Date ? filters.endDate.toISOString() : filters.endDate);
       paramIndex++;
     }
 
     if (filters.userId) {
-      conditions.push(`user_id = $${paramIndex}`);
+      conditions.push(`ar.user_id = $${paramIndex}`);
       params.push(filters.userId);
       paramIndex++;
     }
 
     if (filters.branchId) {
-      conditions.push(`branch_id = $${paramIndex}`);
+      conditions.push(`ar.branch_id = $${paramIndex}`);
       params.push(filters.branchId);
       paramIndex++;
     }
 
     if (filters.actionType) {
-      conditions.push(`action_type = $${paramIndex}`);
+      conditions.push(`ar.action_type = $${paramIndex}`);
       params.push(filters.actionType);
       paramIndex++;
     }
@@ -159,7 +159,7 @@ export class AuditService {
 
     // Get total count
     const countResult = await query(
-      `SELECT COUNT(*) as total FROM audit_records ${whereClause}`,
+      `SELECT COUNT(*) as total FROM audit_records ar ${whereClause}`,
       params
     );
     const total = parseInt(countResult.rows[0].total, 10);
@@ -167,23 +167,45 @@ export class AuditService {
     // Get paginated records (ordered by newest first, uses created_at index)
     const dataParams = [...params, pageSize, offset];
     const dataResult = await query(
-      `SELECT id, user_id, branch_id, action_type, description, metadata, created_at
-       FROM audit_records
+      `SELECT ar.id, ar.user_id, ar.branch_id, ar.action_type, ar.description, ar.metadata, ar.created_at,
+              u.username AS user_name,
+              b.name AS branch_name,
+              si.name AS stock_item_name,
+              si.sku AS stock_item_sku
+       FROM audit_records ar
+       LEFT JOIN users u ON ar.user_id = u.id
+       LEFT JOIN branches b ON ar.branch_id = b.id
+       LEFT JOIN stock_items si ON si.id = (ar.metadata->>'stock_item_id')::uuid
        ${whereClause}
-       ORDER BY created_at DESC
+       ORDER BY ar.created_at DESC
        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
       dataParams
     );
 
-    const records: AuditRecord[] = dataResult.rows.map((row) => ({
-      id: row.id,
-      user_id: row.user_id,
-      branch_id: row.branch_id,
-      action_type: row.action_type,
-      description: row.description,
-      metadata: row.metadata,
-      created_at: new Date(row.created_at),
-    }));
+    const records: AuditRecord[] = dataResult.rows.map((row) => {
+      let description = row.description;
+
+      // Enrich description: replace stock_item UUID with readable name if available
+      if (row.stock_item_name && row.metadata?.stock_item_id) {
+        const itemLabel = `${row.stock_item_name} (${row.stock_item_sku})`;
+        description = description.replace(
+          `item ${row.metadata.stock_item_id}`,
+          itemLabel
+        );
+      }
+
+      return {
+        id: row.id,
+        user_id: row.user_id,
+        branch_id: row.branch_id,
+        action_type: row.action_type,
+        description,
+        metadata: row.metadata,
+        created_at: new Date(row.created_at),
+        user_name: row.user_name || null,
+        branch_name: row.branch_name || null,
+      };
+    });
 
     return {
       records,
@@ -301,7 +323,7 @@ export const auditService = new AuditService();
  */
 export async function auditLog(
   userId: string,
-  branchId: string,
+  branchId: string | null,
   actionType: string,
   description: string,
   metadata?: Record<string, unknown>

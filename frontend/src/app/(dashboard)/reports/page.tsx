@@ -60,7 +60,7 @@ export default function ReportsPage() {
   const { user } = useAuthContext();
   const isAdmin = user?.role === "Admin";
 
-  const { data: branches = [] } = useBranches();
+  const { data: branches = [] } = useBranches({ status: "Active" });
 
   const defaults = getDefaultDateRange();
   const [reportType, setReportType] = useState<ReportType>("sales");
@@ -297,6 +297,18 @@ export default function ReportsPage() {
           >
             Dismiss
           </Button>
+        </div>
+      )}
+
+      {/* Query Error */}
+      {(salesReport.error || stockReport.error) && (
+        <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>
+            {salesReport.error?.message ||
+              stockReport.error?.message ||
+              "Failed to generate report. Please try again."}
+          </span>
         </div>
       )}
 

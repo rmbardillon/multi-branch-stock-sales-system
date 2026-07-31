@@ -32,6 +32,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'stock_item:write',
     'transfer:initiate',
     'transfer:approve',
+    'sales:create',
     'sales:read',
     'report:read',
     'report:export',
@@ -40,6 +41,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   Sales_Staff: [
     'sales:create',
     'sales:read',
+    'stock_item:read',
     'inventory:read',
     'dashboard:read',
   ],

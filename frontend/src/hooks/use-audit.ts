@@ -6,11 +6,13 @@ import { apiClient, ApiClientError } from "@/lib/api-client";
 export interface AuditRecord {
   id: string;
   user_id: string;
-  branch_id: string;
+  branch_id: string | null;
   action_type: string;
   description: string;
   metadata: Record<string, unknown> | null;
   created_at: string;
+  user_name: string | null;
+  branch_name: string | null;
 }
 
 export interface AuditFilters {

@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { stockService } from '../services/stock.service';
+import { stockService, StockServiceError } from '../services/stock.service';
 import { requirePermission } from '../middleware/rbac.middleware';
+import { adjustStockSchema } from '../types/schemas';
+import { auditLog } from '../services/audit.service';
+import { ZodError } from 'zod';
 
 const router = Router();
 
@@ -70,6 +73,76 @@ router.get(
       res.status(500).json({
         error: 'Internal server error',
         message: 'Failed to retrieve consolidated stock view',
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/inventory/:branchId/adjust
+ * Adjust stock quantity for an item at a specific branch.
+ * Requires: inventory:write permission, branch-scoped for non-Admin users.
+ *
+ * Body: { stock_item_id, adjustment (positive to add, negative to remove), reason }
+ * Returns: 200 with previous/new quantity details.
+ */
+router.post(
+  '/:branchId/adjust',
+  requirePermission('inventory:write', (req) => req.params.branchId as string),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const branchId = req.params.branchId as string;
+      const data = adjustStockSchema.parse(req.body);
+
+      const result = await stockService.adjustStock(
+        branchId,
+        data.stock_item_id,
+        data.adjustment
+      );
+
+      // Get item name for a more readable audit description
+      const stockItem = await stockService.getById(data.stock_item_id);
+      const itemLabel = stockItem ? `${stockItem.name} (${stockItem.sku})` : data.stock_item_id;
+
+      // Log audit trail
+      auditLog(
+        req.user!.userId,
+        branchId,
+        'stock_adjustment',
+        `Stock adjusted for ${itemLabel}: ${data.adjustment > 0 ? '+' : ''}${data.adjustment} (${data.reason})`,
+        {
+          stock_item_id: data.stock_item_id,
+          item_name: stockItem?.name,
+          sku: stockItem?.sku,
+          adjustment: data.adjustment,
+          previous_quantity: result.previous_quantity,
+          new_quantity: result.new_quantity,
+          reason: data.reason,
+        }
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({
+          error: 'Validation error',
+          message: 'Invalid request data',
+          details: error.errors,
+        });
+        return;
+      }
+
+      if (error instanceof StockServiceError) {
+        res.status(error.statusCode).json({
+          error: error.statusCode === 404 ? 'Not found' : 'Unprocessable entity',
+          message: error.message,
+        });
+        return;
+      }
+
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Failed to adjust stock',
       });
     }
   }

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { transferService, TransferServiceError } from '../services/transfer.service';
 import { requirePermission } from '../middleware/rbac.middleware';
 import { createTransferSchema } from '../types/schemas';
+import { auditLog } from '../services/audit.service';
 import { ZodError } from 'zod';
 import type { TransferStatus } from '../types/entities';
 
@@ -26,6 +27,21 @@ router.post(
 
       // Initiate the transfer
       const transfer = await transferService.initiate(req.user!.userId, data);
+
+      // Log audit trail
+      const lineCount = transfer.line_items?.length ?? data.line_items.length;
+      auditLog(
+        req.user!.userId,
+        data.source_branch_id,
+        'transfer_initiated',
+        `Transfer initiated: ${lineCount} item${lineCount > 1 ? 's' : ''} from branch to ${data.destination_branch_id.slice(0, 8)}...`,
+        {
+          transfer_id: transfer.id,
+          source_branch_id: data.source_branch_id,
+          destination_branch_id: data.destination_branch_id,
+          line_item_count: lineCount,
+        }
+      );
 
       res.status(201).json(transfer);
     } catch (error) {
@@ -80,9 +96,36 @@ router.post(
         req.user!.userId
       );
 
+      // Log audit trail
+      auditLog(
+        req.user!.userId,
+        confirmedTransfer.source_branch_id,
+        'transfer_confirmed',
+        `Transfer ${transferId.slice(0, 8)}... confirmed`,
+        {
+          transfer_id: transferId,
+          source_branch_id: confirmedTransfer.source_branch_id,
+          destination_branch_id: confirmedTransfer.destination_branch_id,
+        }
+      );
+
       res.status(200).json(confirmedTransfer);
     } catch (error) {
       if (error instanceof TransferServiceError) {
+        // Log failed transfer attempt if it was a stock/state issue (422)
+        if (error.statusCode === 422) {
+          auditLog(
+            req.user!.userId,
+            req.params.id,
+            'transfer_failed',
+            `Transfer ${req.params.id.slice(0, 8)}... failed: ${error.message}`,
+            {
+              transfer_id: req.params.id,
+              reason: error.message,
+            }
+          );
+        }
+
         res.status(error.statusCode).json({
           error:
             error.statusCode === 404

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { salesService, SalesServiceError } from '../services/sales.service';
 import { requirePermission } from '../middleware/rbac.middleware';
 import { createSaleSchema } from '../types/schemas';
+import { auditLog } from '../services/audit.service';
 import { ZodError } from 'zod';
 
 const router = Router();
@@ -27,6 +28,22 @@ router.post(
       const transaction = await salesService.createTransaction(
         req.user!.userId,
         data
+      );
+
+      // Log audit trail
+      const lineCount = transaction.line_items.length;
+      const totalAmount = Number(transaction.total_amount).toFixed(2);
+      auditLog(
+        req.user!.userId,
+        data.branch_id,
+        'sale_created',
+        `Sale ${transaction.reference_number} created: ${lineCount} item${lineCount > 1 ? 's' : ''}, total $${totalAmount}`,
+        {
+          reference_number: transaction.reference_number,
+          transaction_id: transaction.id,
+          total_amount: transaction.total_amount,
+          line_item_count: lineCount,
+        }
       );
 
       res.status(201).json(transaction);
@@ -77,7 +94,7 @@ router.get(
         ? new Date(req.query.startDate)
         : undefined;
       const endDate = typeof req.query.endDate === 'string'
-        ? new Date(req.query.endDate)
+        ? new Date(req.query.endDate + 'T23:59:59.999Z')
         : undefined;
       const page = typeof req.query.page === 'string'
         ? parseInt(req.query.page, 10)

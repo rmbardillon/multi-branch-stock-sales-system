@@ -5,10 +5,18 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { useAuthContext } from "@/providers/auth-provider";
 import { useSales, type SaleFilters } from "@/hooks/use-sales";
+import { useBranches } from "@/hooks/use-branches";
 import { SalesTable } from "@/components/data-table/sales-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function SalesPage() {
   const router = useRouter();
@@ -19,7 +27,11 @@ export default function SalesPage() {
     user?.role === "Branch_Manager" ||
     user?.role === "Sales_Staff";
 
-  const branchId = user?.role === "Admin" ? user?.assignedBranchId : user?.assignedBranchId;
+  const isAdmin = user?.role === "Admin";
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
+  const branchId = isAdmin ? selectedBranchId : user?.assignedBranchId;
+
+  const { data: branches } = useBranches({ status: "Active" });
 
   const [filters, setFilters] = useState<SaleFilters>({
     page: 1,
@@ -73,6 +85,31 @@ export default function SalesPage() {
           </Button>
         )}
       </div>
+
+      {/* Branch selector for Admin */}
+      {isAdmin && (
+        <div className="space-y-2 max-w-md">
+          <Label>Branch</Label>
+          <Select
+            value={selectedBranchId}
+            onValueChange={(value) => {
+              setSelectedBranchId(value);
+              setFilters({ page: 1, pageSize: 10 });
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a branch" />
+            </SelectTrigger>
+            <SelectContent>
+              {branches?.map((branch) => (
+                <SelectItem key={branch.id} value={branch.id}>
+                  {branch.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Date range filter */}
       <div className="flex flex-wrap items-end gap-4">

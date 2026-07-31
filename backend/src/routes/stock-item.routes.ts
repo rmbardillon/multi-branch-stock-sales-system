@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { createStockItemSchema, updateStockItemSchema } from '../types/schemas';
 import { stockService, StockServiceError } from '../services/stock.service';
 import { requirePermission } from '../middleware/rbac.middleware';
+import { query } from '../database/connection';
 
 const router = Router();
 
@@ -93,6 +94,50 @@ router.get(
       res.status(500).json({
         error: 'Internal server error',
         message: 'Failed to search stock items',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/stock-items/sku/:sku
+ * Get a single stock item by exact SKU (case-insensitive).
+ * Designed for barcode scanner / POS lookup.
+ * Requires: stock_item:read permission
+ */
+router.get(
+  '/sku/:sku',
+  requirePermission('stock_item:read'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const sku = req.params.sku;
+
+      if (!sku || sku.trim().length === 0) {
+        res.status(400).json({
+          error: 'Validation failed',
+          message: 'SKU parameter is required',
+        });
+        return;
+      }
+
+      const result = await query(
+        `SELECT * FROM stock_items WHERE LOWER(sku) = LOWER($1) AND is_active = true`,
+        [sku.trim()]
+      );
+
+      if (result.rows.length === 0) {
+        res.status(404).json({
+          error: 'Not found',
+          message: `No active stock item found with SKU "${sku}"`,
+        });
+        return;
+      }
+
+      res.status(200).json(result.rows[0]);
+    } catch (error) {
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Failed to look up stock item by SKU',
       });
     }
   }

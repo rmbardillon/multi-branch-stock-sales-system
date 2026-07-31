@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { createBranchSchema, updateBranchSchema } from '../types/schemas';
 import { branchService, BranchServiceError } from '../services/branch.service';
 import { requireAdmin } from '../middleware/rbac.middleware';
+import { auditLog } from '../services/audit.service';
 import type { BranchStatus } from '../types/entities';
 
 const router = Router();
@@ -58,6 +59,20 @@ router.post('/', requireAdmin(), async (req: Request, res: Response): Promise<vo
     }
 
     const branch = await branchService.create(parseResult.data);
+
+    // Log audit trail
+    auditLog(
+      req.user!.userId,
+      branch.id,
+      'branch_created',
+      `Branch "${branch.name}" created`,
+      {
+        branch_id: branch.id,
+        branch_name: branch.name,
+        address: branch.address,
+        status: branch.status,
+      }
+    );
 
     res.status(201).json({ data: branch });
   } catch (error) {
@@ -126,6 +141,19 @@ router.put('/:id', requireAdmin(), async (req: Request, res: Response): Promise<
 
     const branch = await branchService.update(id, parseResult.data);
 
+    // Log audit trail
+    auditLog(
+      req.user!.userId,
+      branch.id,
+      'branch_updated',
+      `Branch "${branch.name}" updated`,
+      {
+        branch_id: branch.id,
+        branch_name: branch.name,
+        changes: Object.keys(parseResult.data),
+      }
+    );
+
     res.status(200).json({ data: branch });
   } catch (error) {
     if (error instanceof BranchServiceError) {
@@ -154,6 +182,20 @@ router.patch('/:id', requireAdmin(), async (req: Request, res: Response): Promis
     const { id } = req.params;
 
     const result = await branchService.deactivate(id);
+
+    // Log audit trail
+    auditLog(
+      req.user!.userId,
+      result.branch.id,
+      'branch_deactivated',
+      `Branch "${result.branch.name}" deactivated`,
+      {
+        branch_id: result.branch.id,
+        branch_name: result.branch.name,
+        pending_sales: result.pendingWarning?.sales,
+        pending_transfers: result.pendingWarning?.transfers,
+      }
+    );
 
     const response: Record<string, unknown> = { data: result.branch };
 

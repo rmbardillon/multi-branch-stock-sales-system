@@ -75,3 +75,9 @@ export interface UpdateUserDto {
   assigned_branch_id?: string | null;
   is_active?: boolean;
 }
+
+export interface AdjustStockDto {
+  stock_item_id: string;
+  adjustment: number;
+  reason: string;
+}

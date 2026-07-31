@@ -203,6 +203,20 @@ export const updateUserSchema = z.object({
   }
 );
 
+// --- Stock Adjustment ---
+
+export const adjustStockSchema = z.object({
+  stock_item_id: z.string().uuid('Stock item ID must be a valid UUID'),
+  adjustment: z
+    .number()
+    .int('Adjustment must be a whole number')
+    .refine((val) => val !== 0, 'Adjustment cannot be zero'),
+  reason: z
+    .string()
+    .min(1, 'Reason is required')
+    .max(500, 'Reason must be at most 500 characters'),
+});
+
 // --- Inferred Types from Schemas ---
 
 export type LoginInput = z.infer<typeof loginSchema>;

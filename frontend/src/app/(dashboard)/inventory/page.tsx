@@ -1,10 +1,15 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { AlertTriangle, Clock, RefreshCw } from "lucide-react";
+import { AlertTriangle, Clock, RefreshCw, PlusCircle } from "lucide-react";
 import { useAuthContext } from "@/providers/auth-provider";
 import { useBranches, type Branch } from "@/hooks/use-branches";
-import { useInventory, useConsolidatedView } from "@/hooks/use-inventory";
+import {
+  useInventory,
+  useConsolidatedView,
+  useAdjustStock,
+} from "@/hooks/use-inventory";
+import { useStockItems } from "@/hooks/use-stock-items";
 import { InventoryTable } from "@/components/data-table/inventory-table";
 import {
   Select,
@@ -21,8 +26,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 /** Threshold in milliseconds to consider data stale (5 minutes) */
 const STALE_THRESHOLD_MS = 5 * 60 * 1000;
@@ -67,6 +81,62 @@ export default function InventoryPage() {
 
   const { data: consolidatedData, isLoading: isConsolidatedLoading } =
     useConsolidatedView(consolidatedItemId);
+
+  // Stock adjustment dialog state
+  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const [adjustItemId, setAdjustItemId] = useState("");
+  const [adjustQuantity, setAdjustQuantity] = useState("");
+  const [adjustReason, setAdjustReason] = useState("");
+  const [adjustError, setAdjustError] = useState("");
+
+  const { data: allStockItems } = useStockItems();
+  const adjustStock = useAdjustStock(activeBranchId);
+
+  const canAdjustStock =
+    user?.role === "Admin" || user?.role === "Branch_Manager";
+
+  function handleOpenAdjustDialog() {
+    setAdjustItemId("");
+    setAdjustQuantity("");
+    setAdjustReason("");
+    setAdjustError("");
+    setAdjustDialogOpen(true);
+  }
+
+  async function handleAdjustSubmit() {
+    setAdjustError("");
+
+    if (!adjustItemId) {
+      setAdjustError("Please select a stock item.");
+      return;
+    }
+
+    const qty = parseInt(adjustQuantity, 10);
+    if (isNaN(qty) || qty === 0) {
+      setAdjustError("Quantity must be a non-zero whole number.");
+      return;
+    }
+
+    if (!adjustReason.trim()) {
+      setAdjustError("Please provide a reason for the adjustment.");
+      return;
+    }
+
+    try {
+      await adjustStock.mutateAsync({
+        stock_item_id: adjustItemId,
+        adjustment: qty,
+        reason: adjustReason.trim(),
+      });
+      setAdjustDialogOpen(false);
+    } catch (err: unknown) {
+      if (err && typeof err === "object" && "message" in err) {
+        setAdjustError((err as { message: string }).message);
+      } else {
+        setAdjustError("Failed to adjust stock. Please try again.");
+      }
+    }
+  }
 
   // Determine staleness from the query's dataUpdatedAt (epoch ms from TanStack Query)
   const lastUpdatedStr = dataUpdatedAt
@@ -134,6 +204,13 @@ export default function InventoryPage() {
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
+
+          {canAdjustStock && activeBranchId && (
+            <Button size="sm" onClick={handleOpenAdjustDialog}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Adjust Stock
+            </Button>
+          )}
         </div>
       </div>
 
@@ -299,6 +376,78 @@ export default function InventoryPage() {
             )}
         </CardContent>
       </Card>
+
+      {/* Stock Adjustment Dialog */}
+      <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adjust Stock</DialogTitle>
+            <DialogDescription>
+              Add or remove stock for an item at this branch. Use a positive
+              number to add stock, or a negative number to remove.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Stock Item</Label>
+              <Select value={adjustItemId} onValueChange={setAdjustItemId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an item" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allStockItems?.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.sku} — {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Quantity Adjustment</Label>
+              <Input
+                type="number"
+                placeholder="e.g. 50 to add, -10 to remove"
+                value={adjustQuantity}
+                onChange={(e) => setAdjustQuantity(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Positive = add stock, Negative = remove stock
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Reason</Label>
+              <Input
+                placeholder="e.g. Received shipment, Damaged goods write-off"
+                value={adjustReason}
+                onChange={(e) => setAdjustReason(e.target.value)}
+              />
+            </div>
+
+            {adjustError && (
+              <p className="text-sm text-destructive">{adjustError}</p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAdjustDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAdjustSubmit}
+              disabled={adjustStock.isPending}
+            >
+              {adjustStock.isPending ? "Adjusting..." : "Confirm Adjustment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
