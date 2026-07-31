@@ -226,7 +226,7 @@ export default function InventoryPage() {
       )}
 
       {/* Last updated timestamp */}
-      {dataUpdatedAt && !stale && (
+      {!!dataUpdatedAt && !stale && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Clock className="h-4 w-4" />
           <span>Last updated: {formatTimestamp(lastUpdatedStr!)}</span>

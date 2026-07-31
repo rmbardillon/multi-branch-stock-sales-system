@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -80,6 +81,20 @@ export function StockItemFormDialog({
       low_stock_threshold: stockItem?.low_stock_threshold ?? 0,
     },
   });
+
+  // Reset form values when stockItem changes (e.g., opening edit dialog)
+  React.useEffect(() => {
+    if (open) {
+      form.reset({
+        sku: stockItem?.sku ?? "",
+        name: stockItem?.name ?? "",
+        description: stockItem?.description ?? "",
+        category: stockItem?.category ?? "",
+        unit_price: stockItem?.unit_price ?? 0,
+        low_stock_threshold: stockItem?.low_stock_threshold ?? 0,
+      });
+    }
+  }, [stockItem, open, form]);
 
   const onSubmit = async (values: StockItemFormValues) => {
     try {

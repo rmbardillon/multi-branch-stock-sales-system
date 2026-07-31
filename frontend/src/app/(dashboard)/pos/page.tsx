@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { ScanBarcode, Trash2, CheckCircle, XCircle, AlertCircle, Printer } from "lucide-react";
 import { useAuthContext } from "@/providers/auth-provider";
 import { useBranches } from "@/hooks/use-branches";
 import { useInventory } from "@/hooks/use-inventory";
 import { useCreateSale } from "@/hooks/use-sales";
-import { fetchStockItemBySku, type StockItem } from "@/hooks/use-stock-items";
+import { fetchStockItemBySku, useSearchStockItems, type StockItem } from "@/hooks/use-stock-items";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +71,27 @@ export default function PosPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const createSale = useCreateSale();
   const { data: inventoryData } = useInventory(branchId);
+
+  // Debounced search for autocomplete suggestions
+  const [debouncedSku, setDebouncedSku] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  useEffect(() => {
+    if (skuInput.length < 2) {
+      setDebouncedSku("");
+      return;
+    }
+    const timer = setTimeout(() => setDebouncedSku(skuInput), 300);
+    return () => clearTimeout(timer);
+  }, [skuInput]);
+
+  const { data: searchResults, isLoading: isSearching } =
+    useSearchStockItems(debouncedSku);
+
+  // Show suggestions when we have a debounced query
+  useEffect(() => {
+    setShowSuggestions(debouncedSku.length >= 2);
+  }, [debouncedSku]);
 
   // Toast helper
   const showToast = useCallback((message: string, type: ToastType) => {
@@ -144,6 +165,40 @@ export default function PosPage() {
 
   // Barcode scanner handler (fires when scanner detected outside of input)
   useBarcodeScanner(handleSkuLookup, { enabled: true });
+
+  // Handle selecting an item from the autocomplete dropdown
+  const handleSelectSuggestion = useCallback(
+    (item: StockItem) => {
+      setLineItems((prev) => {
+        const existing = prev.find((li) => li.stock_item_id === item.id);
+        if (existing) {
+          showToast(`${item.name} — qty +1`, "success");
+          return prev.map((li) =>
+            li.stock_item_id === item.id
+              ? { ...li, quantity: li.quantity + 1 }
+              : li
+          );
+        }
+
+        showToast(`Added: ${item.name}`, "success");
+        return [
+          ...prev,
+          {
+            stock_item_id: item.id,
+            sku: item.sku,
+            name: item.name,
+            quantity: 1,
+            unit_price: Number(item.unit_price),
+          },
+        ];
+      });
+      setSkuInput("");
+      setShowSuggestions(false);
+      setDebouncedSku("");
+      setTimeout(() => inputRef.current?.focus(), 50);
+    },
+    [showToast]
+  );
 
   // Manual input submit (Enter key in the SKU field)
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -372,14 +427,57 @@ export default function PosPage() {
           <ScanBarcode className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={inputRef}
-            placeholder="Scan barcode or type SKU..."
+            placeholder="Scan barcode or type SKU/name..."
             value={skuInput}
             onChange={(e) => setSkuInput(e.target.value.toUpperCase())}
             onKeyDown={handleInputKeyDown}
+            onFocus={() => {
+              if (debouncedSku.length >= 2) setShowSuggestions(true);
+            }}
+            onBlur={() => {
+              // Delay so click on suggestion registers
+              setTimeout(() => setShowSuggestions(false), 200);
+            }}
             className="pl-11 text-lg h-12 font-mono"
             disabled={isLookingUp}
             autoComplete="off"
           />
+
+          {/* Autocomplete suggestions */}
+          {showSuggestions && (
+            <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-60 overflow-auto rounded-md border bg-background shadow-lg">
+              {isSearching ? (
+                <div className="p-3 text-sm text-muted-foreground">
+                  Searching...
+                </div>
+              ) : !searchResults || searchResults.length === 0 ? (
+                <div className="p-3 text-sm text-muted-foreground">
+                  No items found. Press Enter for exact SKU lookup.
+                </div>
+              ) : (
+                searchResults.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted transition-colors"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleSelectSuggestion(item)}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {item.sku}
+                      </span>
+                      <span className="mx-2">—</span>
+                      <span className="font-medium">{item.name}</span>
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {item.category}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
         {isAdmin && branches && (
